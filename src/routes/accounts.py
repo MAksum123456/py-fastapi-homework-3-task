@@ -77,7 +77,7 @@ async def register(
         await db.commit()
         await db.refresh(db_user)
 
-        return db_user
+        return UserRegistrationResponseSchema(id=db_user.id, email=user.email)
     except SQLAlchemyError:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
