@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, status, HTTPException
 from sqlalchemy import select, delete
@@ -31,6 +31,7 @@ from schemas.accounts import (
     TokenRefreshResponseSchema,
     TokenRefreshRequestSchema,
 )
+from security.passwords import hash_password
 
 router = APIRouter()
 
@@ -102,7 +103,12 @@ async def activate(
         )
     if token_result.user.is_active:
         raise HTTPException(status_code=400, detail="User account is already active.")
-    if token_result.expires_at < datetime.utcnow():
+
+    expires_at = token_result.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if expires_at < datetime.now(timezone.utc):
         raise HTTPException(
             status_code=400, detail="Invalid or expired activation token."
         )
@@ -163,7 +169,11 @@ async def reset_password(
     )
     token_result = token_request.scalar_one_or_none()
 
-    if token_result.token != user.token or token_result.expires_at < datetime.utcnow():
+    expires_at = token_result.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if token_result.token != user.token or expires_at < datetime.now(timezone.utc):
         await db.delete(token_result)
         await db.commit()
         raise HTTPException(status_code=400, detail="Invalid email or token.")
